@@ -67,34 +67,31 @@ export function useDictation() {
         recognition.interimResults = true;
         recognition.lang = 'en-US';
 
-        recognition.onresult = (event: SpeechRecognitionEvent) => {
-            let finalTranscript = '';
+        recognition.onresult = async (event: any) => {
             let interimTranscript = '';
+            let finalTranscript = '';
 
             for (let i = event.resultIndex; i < event.results.length; ++i) {
                 if (event.results[i].isFinal) {
                     finalTranscript += event.results[i][0].transcript;
+                    // If we are in Electron, type this out!
+                    if (window.electron) {
+                        await window.electron.typeText(event.results[i][0].transcript);
+                    }
                 } else {
                     interimTranscript += event.results[i][0].transcript;
                 }
             }
 
-            // We append final results to state, how to handle interim?
-            // For a text editor, we usually want: existingText + pendingText
-            // But here we might just return the stream and let the UI handle appending?
-            // Let's simplify and just accumulate everything in this session.
-            // Actually, relying on `event.results` accumulator is safer.
-            const fullTranscript = Array.from(event.results)
-                .map((result: any) => result[0].transcript)
-                .join('');
-
-            setText(fullTranscript);
+            // Just for display in the app, we can keep the full history or just show recent
+            // For now, let's just keep appending to our local state so the user sees it too.
+            setText(prev => prev + finalTranscript + interimTranscript);
         };
 
         recognition.onerror = (event: any) => {
             console.error('Speech recognition error', event.error);
-            setError(event.error);
-            setState('error');
+            setError(JSON.stringify(event.error));
+            setState('idle'); // Reset state on error so we can try again
         };
 
         recognition.onend = () => {
